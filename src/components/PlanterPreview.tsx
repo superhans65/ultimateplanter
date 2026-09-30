@@ -25,7 +25,6 @@ const EAR_BEVEL = 1.8
 function earVerticalPosition(design: PlanterDesign) {
   if (design.animal === 'cat') return design.body.height - 3
   if (design.animal === 'bunny') return design.body.height - 4 + design.animalFeatures.earHeight / 2
-  if (design.animal === 'panda') return design.body.height * 0.86
   return design.body.height * (design.animal === 'dog' ? 0.82 : 0.76)
 }
 
@@ -61,6 +60,23 @@ function CatEar({ x, design, clipping }: { x: number; design: PlanterDesign; cli
   )
 }
 
+function PandaEar({ x, design, clipping }: { x: number; design: PlanterDesign; clipping: Plane[] }) {
+  const width = design.animalFeatures.earWidth
+  const height = design.animalFeatures.earHeight
+  const thickness = Math.max(5, design.opening.wall * 1.8)
+
+  return (
+    <mesh
+      position={[x, design.body.depth * 0.14, design.body.height * 0.92]}
+      scale={[width / 2, thickness, height / 2]}
+      castShadow
+    >
+      <sphereGeometry args={[1, 28, 18]} />
+      <meshStandardMaterial color={planterPreviewTheme.face} roughness={0.72} clippingPlanes={clipping} />
+    </mesh>
+  )
+}
+
 function Ear({
   x,
   design,
@@ -75,7 +91,7 @@ function Ear({
     const width = design.animalFeatures.earWidth
     const height = design.animalFeatures.earHeight
     const shape = new Shape()
-    if (design.animal === 'koala' || design.animal === 'panda' || design.animal === 'bunny') {
+    if (design.animal === 'koala' || design.animal === 'bunny') {
       shape.absellipse(0, 0, width / 2, height / 2, 0, Math.PI * 2, false, 0)
     } else if (design.animal === 'dog') {
       const half = width / 2
@@ -508,15 +524,15 @@ function AnimalModel({ design, inspect }: Omit<Props, 'resetToken' | 'cameraView
   const vessel = useMemo(() => createVesselGeometry(design), [design])
   const clipping = useMemo(() => (inspect ? [new Plane(new Vector3(0, -1, 0), -2)] : []), [inspect])
   const hasEars = design.animal === 'cat' || design.animal === 'dog' || design.animal === 'koala' || design.animal === 'panda' || design.animal === 'bunny'
-  const hasSideEars = design.animal === 'dog' || design.animal === 'koala' || design.animal === 'panda'
+  const hasSideEars = design.animal === 'dog' || design.animal === 'koala'
   const earZ = earVerticalPosition(design)
   const sideRadiusAtEar = design.body.width * vesselOuterScale(design, earZ) / 2
   const sideEarOverlap = Math.max(EAR_BEVEL * 2, design.animalFeatures.earWidth * 0.18)
-  const earX = hasSideEars
-    ? sideRadiusAtEar + design.animalFeatures.earWidth / 2 - sideEarOverlap
-    // Rear ears sit a fixed fraction of the way across the rim, which a round
-    // body pulls in well short of its full width.
-    : design.body.width * vesselOuterScale(design, design.body.height) * (design.animal === 'bunny' ? 0.3 : 0.32)
+  const earX = design.animal === 'panda'
+    ? design.body.width * vesselOuterScale(design, design.body.height) * 0.44
+    : hasSideEars
+      ? sideRadiusAtEar + design.animalFeatures.earWidth / 2 - sideEarOverlap
+      : design.body.width * vesselOuterScale(design, design.body.height) * (design.animal === 'bunny' ? 0.3 : 0.32)
   const limbColor = design.animal === 'duck' ? planterPreviewTheme.duckAccent : design.animal === 'pig' ? planterPreviewTheme.pigAccent : design.body.color
   const pawZ = design.animalFeatures.pawHeight
   const raisedPaws = pawZ > 20
@@ -549,7 +565,9 @@ function AnimalModel({ design, inspect }: Omit<Props, 'resetToken' | 'cameraView
         {hasEars && <>
           {[-1, 1].map((side) => design.animal === 'cat'
             ? <CatEar key={side} x={side * earX} design={design} clipping={clipping} />
-            : <Ear key={side} x={side * earX} design={design} clipping={clipping} />)}
+            : design.animal === 'panda'
+              ? <PandaEar key={side} x={side * earX} design={design} clipping={clipping} />
+              : <Ear key={side} x={side * earX} design={design} clipping={clipping} />)}
         </>}
         <Face design={design} clipping={clipping} />
         {design.animalFeatures.paws && [-1, 1].map((side) => {

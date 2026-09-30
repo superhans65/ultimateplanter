@@ -298,8 +298,8 @@ export const PANDA_PRESET: PlanterDesign = {
     drainDiameter: 8,
   },
   animalFeatures: {
-    earHeight: 25,
-    earWidth: 28,
+    earHeight: 20,
+    earWidth: 20,
     paws: false,
     feet: false,
     pawScale: 0.9,
@@ -686,15 +686,20 @@ export function validateDesign(design: PlanterDesign): DesignIssue[] {
 
 export function finalBounds(design: PlanterDesign) {
   const pawProjection = design.animalFeatures.paws || design.animalFeatures.feet ? 6 * design.animalFeatures.pawScale : 0
-  const hasSideEars = design.animal === 'dog' || design.animal === 'koala' || design.animal === 'panda'
+  const hasSideEars = design.animal === 'dog' || design.animal === 'koala'
   const finalWidth = design.animal === 'mushroom'
     ? design.body.width * 1.2
     : hasSideEars ? Math.max(design.body.width, design.body.width * 0.98 + design.animalFeatures.earWidth) : design.body.width
   const relief = design.texture.pattern === 'none' ? 0 : design.texture.depth * 2
+  const bodyAndEarsHeight = design.animal === 'cat' || design.animal === 'bunny'
+    ? design.body.height + design.animalFeatures.earHeight
+    : design.animal === 'panda'
+      ? Math.max(design.body.height, design.body.height * 0.92 + design.animalFeatures.earHeight / 2)
+      : design.body.height
   return {
     width: design.animal === 'mushroom' ? finalWidth : finalWidth + relief,
     depth: design.animal === 'mushroom' ? design.body.depth * 1.15 : design.body.depth + pawProjection + relief,
-    height: legLift(design) + design.body.height + (design.animal === 'cat' || design.animal === 'bunny' ? design.animalFeatures.earHeight : 0),
+    height: legLift(design) + bodyAndEarsHeight,
   }
 }
 
