@@ -64,13 +64,17 @@ function PandaEar({ x, design, clipping }: { x: number; design: PlanterDesign; c
   const width = design.animalFeatures.earWidth
   const height = design.animalFeatures.earHeight
   const thickness = Math.max(5, design.opening.wall * 1.8)
+  const z = design.body.height * 0.92
+  const rearWall = vesselFrontSurface(design, x, z)
+  const normalOffset = thickness * 0.55
+  const position: [number, number, number] = [
+    x + rearWall.normalX * normalOffset,
+    -rearWall.y - rearWall.normalY * normalOffset,
+    z,
+  ]
 
   return (
-    <mesh
-      position={[x, design.body.depth * 0.14, design.body.height * 0.92]}
-      scale={[width / 2, thickness, height / 2]}
-      castShadow
-    >
+    <mesh position={position} scale={[width / 2, thickness, height / 2]} castShadow>
       <sphereGeometry args={[1, 28, 18]} />
       <meshStandardMaterial color={planterPreviewTheme.face} roughness={0.72} clippingPlanes={clipping} />
     </mesh>
