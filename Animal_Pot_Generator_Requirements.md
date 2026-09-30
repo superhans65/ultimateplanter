@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Build a browser-based app that lets a user design a cute animal-themed plant pot or decorative container, preview it in 3D, and export a printable model. The app should generate geometry from editable parameters. The first visual target is the supplied cat pot: a rounded open vessel with two ears rising behind the rim, large eyes, a small mouth, cheeks, and rounded paws on the front. This image guides the style; its exact shape and appearance are not an export requirement.
+Build a browser-based app that lets a user design a cute animal-themed plant pot or decorative container, preview it in 3D, and export a printable model. The app should generate geometry from editable parameters. The supplied puppy and cat planters guide the rounded silhouette, ear families, friendly face, and low or raised paw placement. Their plants, glossy glass eyes, paint, and photographic finish are presentation references rather than geometry an ordinary STL can reproduce.
 
 This brief describes the intended product and a practical first release. It does not choose a domain, brand, pricing model, or deployment stack.
 
 ## Core experience
 
-1. Start from an animal preset, initially **cat**. Show a usable default model immediately.
+1. Start from a coherent character preset: **kawaii, dog, cat, bunny, koala, panda, duck, pig, or mushroom**. Show a usable default model immediately.
 2. Adjust vessel dimensions and shape, wall and floor thickness, ears, facial features, paws, and optional drainage.
 3. See the changes in an interactive 3D preview, including the opening and interior. Show dimensions in millimetres.
 4. Choose a printable assembly: a single-colour integrated model, or a body plus separate contrasting face pieces when that mode is supported.
@@ -28,11 +28,12 @@ The UI should prioritize quick creation. Presets give coherent combinations, whi
 
 ### Animal features
 
-- **Cat preset first:** paired pointed ears, two large eyes, a small mouth, cheek accents, and optional paired rounded paws. Provide a modest set of eye and mouth variants. Symmetry is the default, with independent positioning only if it is straightforward to implement safely.
+- **Core presets:** neutral kawaii, dog, cat, bunny, koala, panda, duck, pig, and a clearly labelled two-part mushroom. They combine pointed, floppy, round, or long ears; nose, beak, or snout features; matte face relief; independent arms/paws and feet; and coherent proportions. Symmetry is the default.
+- Eyes can be printable matte relief or optional shallow flat mounting pads for post-print glass eyes. Mount diameter, spacing, and attachment clearance must be reflected in the preview and export; the app must not imply that glossy glass is produced by an STL.
 - Position face features on the *curved front surface*, using local surface position and orientation. Controls for spacing, vertical position, scale, depth, and visibility must keep the parts attached as the body changes.
 - Ears must join the vessel without thin, fragile tips or exposed intersections. The opening must remain accessible.
-- Paws must have a substantial joined contact with the body and avoid creating a base that rocks. A tail and other animal-specific details are later features.
-- Colour in the preview is an appearance aid, not a guarantee that a single STL prints in multiple colours. The supplied image's glossy eyes and pink cheeks are visual inspiration; printable geometry and colour assignment must be explicit.
+- Arms, paws, and feet must have a substantial joined contact with the body and avoid creating a base that rocks. Pose presets such as relaxed, raised, prayer/heart hands, waving, and holding props require explicit wrist, finger-gap, and support checks.
+- Colour in the preview is an appearance aid, not a guarantee that a single STL prints in multiple colours. Keep default surfaces matte and make printable relief, separate parts, paint, and user-supplied glass eyes explicit.
 
 ### Export and print checks
 
@@ -41,10 +42,19 @@ The UI should prioritize quick creation. Presets give coherent combinations, whi
 - Place the base on Z = 0 and use the intended upright orientation. Include a dimension summary and a warning when geometry exceeds the chosen printable envelope.
 - Validate minimum thickness and narrow connections at ears, paws, face lines, and the rim. Make thresholds configurable in code; choose conservative initial values and confirm them with real prints before treating them as guarantees.
 - Include a low-cost preview mesh and a higher quality export mesh if performance requires it. Preview and export must use the same parameters and visibly agree.
+### Character system and progressive disclosure
+
+- Organize the growing catalog by **body archetype**, then character kit, expression, pose, and assembly. Do not present every combination as an unrelated preset.
+- The first printable archetype is an upright rounded vessel. Later archetypes are squat, horizontal/curling (sleeping cat or seal), full-body seated figures, and a front-alcove body with a separate inset character.
+- Reusable feature families include pointed/floppy/round/long ears, horns, muzzles, beaks, snouts, trunks, tails, flippers, coat or face patches, rim bands/drips, cheeks, and surface accessories.
+- Keep quick-start presets coherent. Advanced controls may override a family without silently resetting unrelated edits.
+- Treat props, complex hand poses, coat overlays, mushroom caps/spots, and alcove figures as separate printable parts unless a validated integrated construction is available.
+- Do not claim photographic gloss, ceramic finish, eco-friendliness, water tightness, durability, or support-free printing from appearance alone. Those depend on material, slicing, orientation, and printer settings.
+
 
 ## Interaction details
 
-The editing panel should group controls into Body, Opening and Base, Animal, Face, Details, and Export. The preview should support orbit, zoom, reset view, and a cutaway or hide-front inspection mode for the interior. Show the current animal and dimensions near the export action. An explicit reset-to-preset action should be available.
+The editing panel should group controls into Body, Opening and Base, Character, Face, Details, and Export. The preview should support orbit, zoom, reset view, and a cutaway or hide-front inspection mode for the interior. Show the current character and dimensions near the export action. An explicit reset-to-preset action should be available.
 
 Provide sensible defaults around a small desktop planter scale, but keep actual values as implementation choices until tested. A parameter change should update the preview promptly. If a combination cannot be generated, keep the last valid preview, show which control caused the problem, and block export of the invalid configuration.
 
@@ -58,17 +68,17 @@ The app should be independent of the cookie-cutter product at first. Reuse commo
 
 ## Acceptance criteria for MVP
 
-- A user can load the cat preset, change width, height, opening, wall thickness, and feature size/placement, then download an STL without editing code.
+- A user can load any core preset, change width, height, opening, wall thickness, paw height, independent feet, and face size/placement, choose printed eyes or flat glass-eye mounts, then download an STL without editing code.
 - The preview shows the open interior and matches the exported silhouette, feature layout, and dimensions within the chosen mesh resolution.
 - The default model and a matrix of minimum/maximum valid body settings produce slicer-readable, manifold meshes with attached ears, eyes, mouth, and paws when enabled.
 - Turning drainage off produces a continuous floor; turning it on creates a through-hole without stray geometry.
 - Ear and paw joints remain intact for valid settings, and the base lies flat at Z = 0.
 - Invalid settings show a useful error and cannot be exported.
-- At least one default integrated cat model is physically test printed, with any changes to the safe parameter ranges recorded afterward.
+- At least the default dog, cat, and neutral kawaii models are physically test printed, with any changes to the safe parameter ranges recorded afterward.
 
 ## Later phases
 
-After the cat geometry is reliable, add a small animal system: bear (round ears), bunny (long ears), fox (pointed ears and muzzle), dog (ear variants), and panda (round ears and eye patches). Build these from compatible feature families rather than maintaining a separate bespoke generator for each animal. Add tails, feet, more expressions, colour-separated parts or 3MF, saved designs, preset sharing, and optional prompt-to-parameters AI as separate milestones. AI should select and adjust validated parameters, not be required to invent the printable mesh.
+After the upright rounded geometry is reliable, build new presets from compatible feature families rather than bespoke generators. Add fox, bear, cow, sheep, raccoon, elephant, hedgehog, zebra, penguin, and other catalog entries as configurations of proven parts. Add horizontal/curling, full-body, and alcove body archetypes only with their own topology and print fixture tests. Colour-separated parts or 3MF, saved designs, preset sharing, and optional prompt-to-parameters AI are separate milestones. AI should select and adjust validated parameters, not invent unvalidated printable meshes.
 
 ## Decisions for product owner before expansion
 

@@ -1,9 +1,13 @@
 import type { Metadata } from 'next'
-import { DM_Sans, Fraunces } from 'next/font/google'
+import { Space_Grotesk } from 'next/font/google'
 import './globals.css'
 
-const sans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' })
-const display = Fraunces({ subsets: ['latin'], variable: '--font-display' })
+const sans = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-sans',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Ultimate Planter — make a planter with personality',
@@ -20,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable}`}>
+    <html lang="en" className={sans.variable}>
       <body>{children}</body>
     </html>
   )

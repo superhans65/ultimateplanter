@@ -1,7 +1,7 @@
 # Ultimate Planter
 
 Browser-based animal planter designer for [ultimateplanter.com](https://ultimateplanter.com).
-The product starts with a configurable cat vessel, live 3D preview, printable
+The product starts with nine configurable character vessels, live 3D preview, printable
 dimension checks, and a path to secure server-generated STL exports.
 
 The source brief is [Animal_Pot_Generator_Requirements.md](./Animal_Pot_Generator_Requirements.md).
@@ -11,10 +11,15 @@ The source brief is [Animal_Pot_Generator_Requirements.md](./Animal_Pot_Generato
 This repository contains the first working product slice:
 
 - responsive public editor shell and Ultimate Planter branding;
-- versioned cat parameter model with safe ranges and validation;
+- versioned kawaii, dog, cat, bunny, koala, panda, duck, pig, and mushroom presets;
 - real-millimetre closed vessel geometry, including interior, solid floor,
   rim, and optional through-drain;
-- parameterized ears, face, cheeks, and paws in the live preview;
+- parameterized pointed, floppy, round, or long ears; matte face relief; arms and feet;
+- nine eye styles (round, dot, sparkle, sleepy, happy, closed, wink, heart,
+  star) and eight nose styles (none, button, oval, tall oval, triangle, heart,
+  snout, beak), with eye, nose, mouth, and cheek sizes adjustable independently;
+- optional shallow mounting pads for post-print glass eyes;
+- an explicitly two-part mushroom cap/stem preview with separate spot pieces;
 - orbit, zoom, reset, 10 mm grid, and interior cutaway;
 - last-valid-preview behavior for invalid settings;
 - local draft persistence and JSON design download;
