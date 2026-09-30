@@ -104,3 +104,24 @@ export function faceExtent(design: PlanterDesign) {
   }
   return { halfWidth, bottom, top }
 }
+
+/** A front paw on the right (mirror x for the left): a half-sunk ellipsoid. */
+export function pawLayout(design: PlanterDesign) {
+  const { pawHeight: z, pawScale: scale } = design.animalFeatures
+  // Raised paws stand upright beside the face; low ones lie wide at the base.
+  const raised = z > 20
+  return {
+    raised,
+    x: design.body.width * (raised ? 0.39 : 0.28),
+    z,
+    halfWidth: (raised ? 10 : 13) * scale,
+    halfHeight: (raised ? 13 : 10) * scale,
+    depth: (raised ? 7 : 8) * scale,
+  }
+}
+
+/** A separate foot on the right (mirror x for the left), at the base. */
+export function footLayout(design: PlanterDesign) {
+  const scale = design.animalFeatures.pawScale
+  return { x: design.body.width * 0.25, z: 5, halfWidth: 11 * scale, halfHeight: 7 * scale, depth: 8 * scale }
+}

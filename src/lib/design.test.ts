@@ -56,6 +56,7 @@ describe('planter design model', () => {
     delete legacyFeatures.legs
     delete legacyFeatures.legHeight
     delete (legacy as unknown as { body: Record<string, unknown> }).body.shape
+    delete (legacy as unknown as { texture?: unknown }).texture
     expect(parseDesign(JSON.stringify(legacy))).toEqual(DOG_PRESET)
 
     const legacyCat = structuredClone(CAT_PRESET) as unknown as { face: Record<string, unknown> }
@@ -89,6 +90,23 @@ describe('planter design model', () => {
     short = updateAtPath(short, 'animalFeatures.pawHeight', 20)
     expect(validateDesign(short)).toEqual([])
     expect(validateDesign(updateAtPath(short, 'body.height', BODY_HEIGHT.min - 1)).some((issue) => issue.field === 'body.height')).toBe(true)
+  })
+
+  it('widens the final bounds by the texture relief', () => {
+    const ribbed = updateAtPath(DOG_PRESET, 'texture.pattern', 'ribs')
+    const plain = finalBounds(DOG_PRESET)
+    expect(finalBounds(ribbed)).toEqual({ width: plain.width + 2.4, depth: plain.depth + 2.4, height: plain.height })
+  })
+
+  it('flags textures too fine, too deep or too upright to print', () => {
+    const knurl = updateAtPath(updateAtPath(CAT_PRESET, 'texture.pattern', 'knurl'), 'texture.angle', 45)
+    expect(validateDesign(knurl)).toEqual([])
+    const fine = updateAtPath(updateAtPath(updateAtPath(knurl, 'body.width', 70), 'body.depth', 65), 'texture.count', 60)
+    expect(validateDesign(fine).some((issue) => issue.field === 'texture.count')).toBe(true)
+    expect(validateDesign(updateAtPath(knurl, 'texture.depth', 3)).some((issue) => issue.field === 'texture.depth')).toBe(true)
+    expect(validateDesign(updateAtPath(knurl, 'texture.angle', 5)).some((issue) => issue.field === 'texture.angle')).toBe(true)
+    // Upright ribs are fine on their own.
+    expect(validateDesign(updateAtPath(updateAtPath(knurl, 'texture.pattern', 'ribs'), 'texture.angle', 0))).toEqual([])
   })
 
   it('rejects unknown versions', () => {

@@ -11,7 +11,10 @@ import {
   EYE_STYLES,
   LEG_HEIGHT,
   NOSE_STYLES,
+  TEXTURE_LIMITS,
+  TEXTURE_PATTERNS,
   clonePreset,
+  isCrossingPattern,
   finalBounds,
   hasMouth,
   parseDesign,
@@ -19,6 +22,7 @@ import {
   validateDesign,
   type Animal,
   type PlanterDesign,
+  type TexturePattern,
 } from '@/lib/design'
 import { planterThemeVariables } from '@/lib/theme'
 
@@ -68,6 +72,18 @@ const faceControls: Control[] = [
   { label: 'Overall feature scale', path: 'face.scale', min: 0.65, max: 1.5, step: 0.05 },
   { label: 'Relief depth', path: 'face.depth', min: 1, max: 5, step: 0.1, unit: 'mm' },
 ]
+
+const textureControls: Control[] = [
+  { label: 'Rib count', path: 'texture.count', min: TEXTURE_LIMITS.count.min, max: TEXTURE_LIMITS.count.max },
+  { label: 'Relief depth', path: 'texture.depth', min: TEXTURE_LIMITS.depth.min, max: TEXTURE_LIMITS.depth.max, step: 0.1, unit: 'mm' },
+]
+const panelFadeControl: Control = { label: 'Face panel edge', path: 'texture.panelFade', min: TEXTURE_LIMITS.panelFade.min, max: TEXTURE_LIMITS.panelFade.max, step: 0.5, unit: 'mm' }
+
+// Crossing families need a lean to cross at all; 45° gives square diamonds.
+function withTexturePattern(design: PlanterDesign, pattern: TexturePattern) {
+  const next = updateAtPath(design, 'texture.pattern', pattern)
+  return isCrossingPattern(pattern) && next.texture.angle < TEXTURE_LIMITS.angle.minCrossing ? updateAtPath(next, 'texture.angle', 45) : next
+}
 
 const legHeightControl: Control = { label: 'Leg height', path: 'animalFeatures.legHeight', min: LEG_HEIGHT.min, max: LEG_HEIGHT.max, unit: 'mm' }
 const eyeSizeControl: Control = { label: 'Eye size', path: 'face.eyeScale', min: 0.5, max: 1.8, step: 0.05 }
@@ -293,6 +309,31 @@ export function PlanterEditor() {
                   <button key={shape.value} className={design.body.shape === shape.value ? 'active' : ''} aria-pressed={design.body.shape === shape.value} onClick={() => setDesign(updateAtPath(design, 'body.shape', shape.value))}>{shape.label}</button>
                 ))}
               </div>
+            </Group>
+            <Group title="Surface texture" controls={[]} design={design} setDesign={setDesign}>
+              <div className="segmented four" aria-label="Texture pattern">
+                {TEXTURE_PATTERNS.map((pattern) => (
+                  <button key={pattern.value} className={design.texture.pattern === pattern.value ? 'active' : ''} aria-pressed={design.texture.pattern === pattern.value} onClick={() => setDesign(withTexturePattern(design, pattern.value))}>{pattern.label}</button>
+                ))}
+              </div>
+              {design.texture.pattern !== 'none' && (
+                <>
+                  {textureControls.map((control) => <Slider key={control.path} control={control} design={design} setDesign={setDesign} />)}
+                  <Slider
+                    control={{
+                      label: isCrossingPattern(design.texture.pattern) ? 'Crossing angle' : 'Lean',
+                      path: 'texture.angle',
+                      min: isCrossingPattern(design.texture.pattern) ? TEXTURE_LIMITS.angle.minCrossing : 0,
+                      max: TEXTURE_LIMITS.angle.max,
+                      unit: '°',
+                    }}
+                    design={design}
+                    setDesign={setDesign}
+                  />
+                  <Slider control={panelFadeControl} design={design} setDesign={setDesign} />
+                  <span className="option-label">Raised relief, plain behind the face and at the rim and base.</span>
+                </>
+              )}
             </Group>
             <Group title="Opening & base" controls={design.body.shape === 'round' ? roundOpeningControls : openingControls} design={design} setDesign={setDesign}>
               {design.body.shape === 'round' && <span className="option-label">The opening follows the round rim. Roundness and wall set its size.</span>}

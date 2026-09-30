@@ -1,7 +1,8 @@
 import { BufferGeometry, Float32BufferAttribute, Vector3 } from 'three'
-import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { PlanterDesign } from './design'
 import { vesselInnerRadii, vesselOpening, vesselOuterScale, vesselOuterSlope } from './profile'
+import { outerWall } from './texture'
 
 export { vesselOuterScale }
 
@@ -266,16 +267,19 @@ export function createLegsGeometry(design: PlanterDesign, segments = 40): Buffer
 
 /**
  * Builds one closed vessel shell in millimetres: outside, inside, rim, floor,
- * underside, and (when enabled) the wall of the drainage hole.
+ * underside, and (when enabled) the wall of the drainage hole. The outer wall
+ * carries any texture relief and is shaded smooth on its own; the rest is
+ * creased so the rim and base edges stay crisp.
  */
-export function createVesselGeometry(design: PlanterDesign, segments = 72): BufferGeometry {
+export function createVesselGeometry(design: PlanterDesign): BufferGeometry {
   const positions: number[] = []
   const { body, opening } = design
+  const wall = outerWall(design)
+  const { angles, columns: segments } = wall
   // Enough levels for the round body's curve to stay smooth.
   const levels = body.shape === 'round' ? 40 : 18
-  const outerRx = body.width / 2
-  const outerRy = body.depth / 2
   const drainRadius = opening.drainage ? opening.drainDiameter / 2 : 0
+  const angle = (i: number) => angles[i % segments]
 
   const tri = (a: Point, b: Point, c: Point) => positions.push(...a, ...b, ...c)
   const quad = (a: Point, b: Point, c: Point, d: Point, inward = false) => {
@@ -288,23 +292,19 @@ export function createVesselGeometry(design: PlanterDesign, segments = 72): Buff
     }
   }
 
-  const outerScale = (t: number) => vesselOuterScale(design, body.height * t)
-
-  // Outer wall
-  for (let level = 0; level < levels; level += 1) {
-    const t0 = level / levels
-    const t1 = (level + 1) / levels
+  // Outer wall, as one indexed grid wrapping around.
+  const wallPositions: number[] = []
+  const wallIndices: number[] = []
+  for (let level = 0; level <= wall.levels; level += 1) {
+    for (let i = 0; i < segments; i += 1) wallPositions.push(...wall.point(i, level))
+  }
+  for (let level = 0; level < wall.levels; level += 1) {
     for (let i = 0; i < segments; i += 1) {
-      const a0 = (i / segments) * Math.PI * 2
-      const a1 = ((i + 1) / segments) * Math.PI * 2
-      const s0 = outerScale(t0)
-      const s1 = outerScale(t1)
-      quad(
-        ellipse(outerRx * s0, outerRy * s0, body.height * t0, a0),
-        ellipse(outerRx * s0, outerRy * s0, body.height * t0, a1),
-        ellipse(outerRx * s1, outerRy * s1, body.height * t1, a1),
-        ellipse(outerRx * s1, outerRy * s1, body.height * t1, a0),
-      )
+      const a = level * segments + i
+      const b = level * segments + (i + 1) % segments
+      const c = b + segments
+      const d = a + segments
+      wallIndices.push(a, b, c, a, c, d)
     }
   }
 
@@ -316,8 +316,8 @@ export function createVesselGeometry(design: PlanterDesign, segments = 72): Buff
     const r0 = vesselInnerRadii(design, z0)
     const r1 = vesselInnerRadii(design, z1)
     for (let i = 0; i < segments; i += 1) {
-      const a0 = (i / segments) * Math.PI * 2
-      const a1 = ((i + 1) / segments) * Math.PI * 2
+      const a0 = angle(i)
+      const a1 = angle(i + 1)
       quad(
         ellipse(r0.rx, r0.ry, z0, a0),
         ellipse(r1.rx, r1.ry, z1, a0),
@@ -331,43 +331,53 @@ export function createVesselGeometry(design: PlanterDesign, segments = 72): Buff
   const floor = vesselInnerRadii(design, opening.floor)
 
   for (let i = 0; i < segments; i += 1) {
-    const a0 = (i / segments) * Math.PI * 2
-    const a1 = ((i + 1) / segments) * Math.PI * 2
-    const topScale = outerScale(1)
+    const a0 = angle(i)
+    const a1 = angle(i + 1)
 
-    // Soft-looking planar rim.
+    // Soft-looking planar rim, meeting the outer wall's top ring exactly.
     quad(
       ellipse(rim.rx, rim.ry, body.height, a0),
       ellipse(rim.rx, rim.ry, body.height, a1),
-      ellipse(outerRx * topScale, outerRy * topScale, body.height, a1),
-      ellipse(outerRx * topScale, outerRy * topScale, body.height, a0),
+      wall.point(i + 1, wall.levels),
+      wall.point(i, wall.levels),
+      true,
     )
 
     const floorOuter0 = ellipse(floor.rx, floor.ry, opening.floor, a0)
     const floorOuter1 = ellipse(floor.rx, floor.ry, opening.floor, a1)
-    const baseScale = outerScale(0)
-    const baseOuter0 = ellipse(outerRx * baseScale, outerRy * baseScale, 0, a0)
-    const baseOuter1 = ellipse(outerRx * baseScale, outerRy * baseScale, 0, a1)
+    const baseOuter0 = wall.point(i, 0)
+    const baseOuter1 = wall.point(i + 1, 0)
 
     if (opening.drainage) {
       const drainFloor0 = ellipse(drainRadius, drainRadius, opening.floor, a0)
       const drainFloor1 = ellipse(drainRadius, drainRadius, opening.floor, a1)
       const drainBase0 = ellipse(drainRadius, drainRadius, 0, a0)
       const drainBase1 = ellipse(drainRadius, drainRadius, 0, a1)
-      quad(drainFloor0, drainFloor1, floorOuter1, floorOuter0)
-      quad(drainBase0, baseOuter0, baseOuter1, drainBase1)
+      quad(drainFloor0, drainFloor1, floorOuter1, floorOuter0, true)
+      quad(drainBase0, baseOuter0, baseOuter1, drainBase1, true)
       quad(drainBase0, drainBase1, drainFloor1, drainFloor0, true)
     } else {
-      tri([0, 0, opening.floor], floorOuter1, floorOuter0)
-      tri([0, 0, 0], baseOuter0, baseOuter1)
+      tri([0, 0, opening.floor], floorOuter0, floorOuter1)
+      tri([0, 0, 0], baseOuter1, baseOuter0)
     }
   }
 
+  const outer = new BufferGeometry()
+  outer.setAttribute('position', new Float32BufferAttribute(wallPositions, 3))
+  outer.setIndex(wallIndices)
+  outer.computeVertexNormals()
+  const outerFaces = outer.toNonIndexed()
+  outer.dispose()
+
   const faceted = new BufferGeometry()
   faceted.setAttribute('position', new Float32BufferAttribute(positions, 3))
-  // Smooth shading across the curved walls, crisp at the rim and base edges.
-  const geometry = toCreasedNormals(faceted, Math.PI / 6)
+  // Smooth shading across the curved inner wall, crisp at the rim and base edges.
+  const rest = toCreasedNormals(faceted, Math.PI / 6)
   faceted.dispose()
+
+  const geometry = mergeGeometries([outerFaces, rest])
+  outerFaces.dispose()
+  rest.dispose()
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
   return geometry

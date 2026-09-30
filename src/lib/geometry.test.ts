@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CAT_PRESET, PRESETS, SAFE_LIMITS, updateAtPath } from './design'
-import { cheekLayout } from './face'
+import { CAT_PRESET, PRESETS, SAFE_LIMITS, updateAtPath, type PlanterDesign, type TexturePattern } from './design'
+import { cheekLayout, faceExtent, footLayout, pawLayout } from './face'
+import { outerWall } from './texture'
 import { Vector3 } from 'three'
 import { createCatEarGeometry, createLegsGeometry, createSurfaceEllipseGeometry, createVesselGeometry, legLayout, vesselFrontSurface, vesselOuterScale } from './geometry'
 import { roundProfileEnds, vesselInnerRadii, vesselOpening, vesselOuterSlope } from './profile'
@@ -224,5 +225,133 @@ describe('cat ears', () => {
     const left = createCatEarGeometry(CAT_PRESET, -earX)
     expect(left.boundingBox!.min.x).toBeCloseTo(-ear.boundingBox!.max.x, 3)
     expect(left.boundingBox!.min.y).toBeCloseTo(ear.boundingBox!.min.y, 3)
+  })
+})
+
+/** Every edge is shared by exactly two triangles running opposite ways. */
+function isClosedManifold(geometry: BufferGeometry) {
+  const position = geometry.getAttribute('position')
+  const index = geometry.getIndex()
+  const count = index ? index.count : position.count
+  const keys = new Map<string, number>()
+  const key = (i: number) => {
+    const v = index ? index.getX(i) : i
+    const k = [position.getX(v), position.getY(v), position.getZ(v)].map((n) => Math.round(n * 1e4)).join(',')
+    if (!keys.has(k)) keys.set(k, keys.size)
+    return keys.get(k)!
+  }
+  const edges = new Map<string, number>()
+  for (let i = 0; i < count; i += 3) {
+    const [a, b, c] = [key(i), key(i + 1), key(i + 2)]
+    for (const [p, q] of [[a, b], [b, c], [c, a]]) edges.set(`${p}>${q}`, (edges.get(`${p}>${q}`) ?? 0) + 1)
+  }
+  for (const [edge, uses] of edges) {
+    const [p, q] = edge.split('>')
+    if (uses !== 1 || edges.get(`${q}>${p}`) !== 1) return false
+  }
+  return true
+}
+
+describe('wall texture', () => {
+  const textured = (design: PlanterDesign, pattern: TexturePattern, angle = 45) =>
+    updateAtPath(updateAtPath(design, 'texture.pattern', pattern), 'texture.angle', pattern === 'ribs' ? 0 : angle)
+
+  it('keeps every shell closed, smooth or textured', () => {
+    const drained = updateAtPath(PRESETS.dog, 'opening.drainage', true)
+    for (const design of [PRESETS.dog, CAT_PRESET, drained]) {
+      for (const pattern of ['none', 'ribs', 'knurl', 'lattice'] as const) {
+        const geometry = createVesselGeometry(textured(design, pattern))
+        expect(isClosedManifold(geometry)).toBe(true)
+        expect(signedVolume(geometry)).toBeGreaterThan(10000)
+      }
+    }
+  })
+
+  it('adds material without cutting into the wall', () => {
+    const design = textured(CAT_PRESET, 'knurl')
+    const wall = outerWall(design)
+    let deepest = 0
+    let lowest = Infinity
+    for (let level = 0; level <= wall.levels; level += 1) {
+      for (let column = 0; column < wall.columns; column += 1) {
+        const offset = wall.displacement(column, level)
+        deepest = Math.max(deepest, offset)
+        lowest = Math.min(lowest, offset)
+      }
+    }
+    expect(lowest).toBe(0)
+    expect(deepest).toBeGreaterThan(design.texture.depth * 0.9)
+    expect(deepest).toBeLessThanOrEqual(design.texture.depth + 1e-9)
+    expect(signedVolume(createVesselGeometry(design))).toBeGreaterThan(signedVolume(createVesselGeometry(CAT_PRESET)))
+  })
+
+  it('leaves the base, the rim and the face panel plain', () => {
+    const design = textured(updateAtPath(PRESETS.dog, 'face.cheeks', true), 'ribs')
+    const wall = outerWall(design)
+    for (let column = 0; column < wall.columns; column += 1) {
+      expect(wall.displacement(column, 0)).toBe(0)
+      expect(wall.displacement(column, wall.levels)).toBe(0)
+    }
+    const face = faceExtent(design)
+    const faceLevels = wall.heights.flatMap((z, level) => (z >= face.bottom && z <= face.top ? [level] : []))
+    expect(faceLevels.length).toBeGreaterThan(3)
+    for (const level of faceLevels) {
+      const scale = vesselOuterScale(design, wall.heights[level])
+      for (let column = 0; column < wall.columns; column += 1) {
+        const [x, y] = wall.point(column, level)
+        if (y < 0 && Math.abs(x) <= face.halfWidth * scale / vesselOuterScale(design, (face.top + face.bottom) / 2))
+          expect(wall.displacement(column, level)).toBe(0)
+      }
+    }
+    // Round the sides and back, the ribs are there.
+    const middle = Math.round(wall.levels / 2)
+    expect(Math.max(...Array.from({ length: wall.columns }, (_, column) => wall.displacement(column, middle)))).toBeGreaterThan(1)
+  })
+
+  it('sits paws and feet on plain pads', () => {
+    const design = textured(updateAtPath(PRESETS.dog, 'animalFeatures.feet', true), 'knurl')
+    const wall = outerWall(design)
+    for (const limb of [pawLayout(design), footLayout(design)]) {
+      const level = wall.heights.reduce((best, z, l) => (Math.abs(z - limb.z) < Math.abs(wall.heights[best] - limb.z) ? l : best), 0)
+      for (let column = 0; column < wall.columns; column += 1) {
+        const [x, y] = wall.point(column, level)
+        if (y < 0 && Math.abs(Math.abs(x) - limb.x) < limb.halfWidth * 0.5) expect(wall.displacement(column, level)).toBe(0)
+      }
+    }
+  })
+
+  it('mirrors a knurl across the front centre line', () => {
+    const wall = outerWall(textured(PRESETS.dog, 'knurl'))
+    for (const level of [10, 25, 40]) {
+      for (const column of [7, 60, 131]) expect(wall.displacement(column, level)).toBeCloseTo(wall.displacement(wall.columns - column, level), 9)
+    }
+  })
+
+  it('holds the rib angle along the leaning round wall', () => {
+    const design = textured(CAT_PRESET, 'knurl')
+    const wall = outerWall(design)
+    const lean = Math.tan(Math.PI / 4)
+    // A point on the smooth surface, and the horizontal tangent there.
+    const surface = (u: number, level: number) => {
+      const theta = wall.thetaAt(((u % 1) + 1) % 1)
+      const scale = vesselOuterScale(design, wall.heights[level])
+      const rx = design.body.width * scale / 2
+      const ry = design.body.depth * scale / 2
+      return {
+        point: new Vector3(rx * Math.cos(theta), ry * Math.sin(theta), wall.heights[level]),
+        tangent: new Vector3(-rx * Math.sin(theta), ry * Math.cos(theta), 0).normalize(),
+      }
+    }
+    for (const start of [0, 0.25]) {
+      for (const level of [3, Math.round(wall.levels / 2), wall.levels - 4]) {
+        // Follow one line of the first family up a row.
+        const below = surface(start + lean * wall.twists[level], level)
+        const above = surface(start + lean * wall.twists[level + 1], level + 1)
+        const step = above.point.clone().sub(below.point)
+        const across = step.dot(below.tangent)
+        const up = step.clone().addScaledVector(below.tangent, -across).length()
+        expect(Math.abs(Math.atan2(across, up) * 180 / Math.PI - 45)).toBeLessThan(3)
+      }
+    }
   })
 })

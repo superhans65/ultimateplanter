@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { DoubleSide, ExtrudeGeometry, Plane, QuadraticBezierCurve3, Shape, Vector3 } from 'three'
 import type { TrackballControls as TrackballControlsImpl } from 'three-stdlib'
 import { EYE_ARC_STROKE, hasMouth, legLift, type PlanterDesign } from '@/lib/design'
-import { cheekLayout, mouthLayout, noseLayout, whiskerLayout } from '@/lib/face'
+import { cheekLayout, footLayout, mouthLayout, noseLayout, pawLayout, whiskerLayout } from '@/lib/face'
 import { createCatEarGeometry, createLegsGeometry, createSurfaceEllipseGeometry, createVesselGeometry, vesselFrontSurface, vesselOuterScale } from '@/lib/geometry'
 import { vesselOpening } from '@/lib/profile'
 import { planterPreviewTheme } from '@/lib/theme'
@@ -534,11 +534,9 @@ function AnimalModel({ design, inspect }: Omit<Props, 'resetToken' | 'cameraView
       ? sideRadiusAtEar + design.animalFeatures.earWidth / 2 - sideEarOverlap
       : design.body.width * vesselOuterScale(design, design.body.height) * (design.animal === 'bunny' ? 0.3 : 0.32)
   const limbColor = design.animal === 'duck' ? planterPreviewTheme.duckAccent : design.animal === 'pig' ? planterPreviewTheme.pigAccent : design.body.color
-  const pawZ = design.animalFeatures.pawHeight
-  const raisedPaws = pawZ > 20
+  const pawSpec = pawLayout(design)
+  const footSpec = footLayout(design)
   const [hovered, setHovered] = useState(false)
-  const pawX = design.body.width * (raisedPaws ? 0.39 : 0.28)
-  const pawDepth = (raisedPaws ? 7 : 8) * design.animalFeatures.pawScale
   const lift = legLift(design)
 
   useEffect(() => () => vessel.dispose(), [vessel])
@@ -571,13 +569,13 @@ function AnimalModel({ design, inspect }: Omit<Props, 'resetToken' | 'cameraView
         </>}
         <Face design={design} clipping={clipping} />
         {design.animalFeatures.paws && [-1, 1].map((side) => {
-          const paw = featureAttachment(design, side * pawX, pawZ, -pawDepth * 0.18)
+          const paw = featureAttachment(design, side * pawSpec.x, pawSpec.z, -pawSpec.depth * 0.18)
           return (
             <mesh
               key={side}
               position={paw.position}
               rotation={[0, 0, paw.rotation]}
-              scale={raisedPaws ? [10 * design.animalFeatures.pawScale, pawDepth, 13 * design.animalFeatures.pawScale] : [13 * design.animalFeatures.pawScale, pawDepth, 10 * design.animalFeatures.pawScale]}
+              scale={[pawSpec.halfWidth, pawSpec.depth, pawSpec.halfHeight]}
               castShadow
             >
               <sphereGeometry args={[1, 28, 18]} />
@@ -586,16 +584,13 @@ function AnimalModel({ design, inspect }: Omit<Props, 'resetToken' | 'cameraView
           )
         })}
         {design.animalFeatures.feet && [-1, 1].map((side) => {
-          const x = side * design.body.width * 0.25
-          const z = 5
-          const footDepth = 8 * design.animalFeatures.pawScale
-          const foot = featureAttachment(design, x, z, -footDepth * 0.2)
+          const foot = featureAttachment(design, side * footSpec.x, footSpec.z, -footSpec.depth * 0.2)
           return (
             <mesh
               key={`foot-${side}`}
               position={foot.position}
               rotation={[0, 0, foot.rotation]}
-              scale={[11 * design.animalFeatures.pawScale, footDepth, 7 * design.animalFeatures.pawScale]}
+              scale={[footSpec.halfWidth, footSpec.depth, footSpec.halfHeight]}
               castShadow
             >
               <sphereGeometry args={[1, 24, 16]} />
